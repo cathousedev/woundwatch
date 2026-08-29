@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic>=2
+sqlalchemy>=2
+alembic
+psycopg2-binary
+httpx
+instructor
+fhir.resources
+python-multipart
+pytest
+pytest-asyncio
