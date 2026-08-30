@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 pydantic>=2
+pydantic-settings
 sqlalchemy>=2
 alembic
 psycopg2-binary
