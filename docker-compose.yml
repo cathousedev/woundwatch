@@ -1,0 +1,35 @@
+# WoundWatch service.
+#
+# Phase 0: single service, no own DB. WoundWatch reuses the existing Aidbox
+# FHIR Postgres instance (own `woundwatch` schema) — see DATABASE_URL in .env.
+#
+# In production this runs inside the Komodo-managed compose stack on the
+# homelab; the `db` volume below is the only new state (stored wound photos).
+# The Postgres + Aidbox containers are NOT defined here — they're the existing
+# deployment.
+
+services:
+  woundwatch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: woundwatch:latest
+    container_name: woundwatch
+    env_file: .env
+    ports:
+      # Bound to the container's internal port; Caddy fronts the public
+      # woundwatch.cathousedev.com -> this service.
+      - "127.0.0.1:8700:8000"
+    volumes:
+      # Stored wound photos persist beyond container restarts.
+      - "woundwatch_images:/data/woundwatch/images"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request;urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  woundwatch_images:
+    name: woundwatch_images
