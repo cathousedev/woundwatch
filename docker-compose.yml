@@ -1,35 +1,56 @@
-# WoundWatch service.
+# WoundWatch — its own service + its own Postgres.
 #
-# Phase 0: single service, no own DB. WoundWatch reuses the existing Aidbox
-# FHIR Postgres instance (own `woundwatch` schema) — see DATABASE_URL in .env.
-#
-# In production this runs inside the Komodo-managed compose stack on the
-# homelab; the `db` volume below is the only new state (stored wound photos).
-# The Postgres + Aidbox containers are NOT defined here — they're the existing
-# deployment.
+# WoundWatch is self-contained: it owns its Postgres (the `db` service below),
+# so it can stand on its own. The FHIR server (Aidbox) and the MedGemma
+# endpoint are EXTERNAL dependencies, referenced by URL in .env — WoundWatch
+# never shares infrastructure with them, and the FHIR product is pluggable.
 
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: woundwatch-db
+    environment:
+      POSTGRES_USER: woundwatch
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: woundwatch
+    volumes:
+      - "woundwatch_db:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U woundwatch -d woundwatch"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   woundwatch:
     build:
       context: .
       dockerfile: Dockerfile
-    image: woundwatch:latest
     container_name: woundwatch
-    env_file: .env
+    # Bind to the host's loopback by default so this is not exposed on the LAN
+    # until Caddy fronting it is ready.
     ports:
-      # Bound to the container's internal port; Caddy fronts the public
-      # woundwatch.cathousedev.com -> this service.
       - "127.0.0.1:8700:8000"
     volumes:
-      # Stored wound photos persist beyond container restarts.
-      - "woundwatch_images:/data/woundwatch/images"
+      # Store wound photos here; keep separate from the (ephemeral) app fs.
+      - "woundwatch_photos:/app/images"
+    # Local secrets live in .env (gitignored). In the container the DATABASE_URL
+    # is overridden below to point at the `db` service by name.
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://woundwatch:CHANGE_ME@db:5432/woundwatch
+      IMAGE_STORAGE_PATH: /app/images
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request;urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
     restart: unless-stopped
 
 volumes:
-  woundwatch_images:
-    name: woundwatch_images
+  woundwatch_db:
+  woundwatch_photos:
