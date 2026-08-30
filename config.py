@@ -3,10 +3,12 @@
 All values are sourced from the environment (or a `.env` file) so the app can
 be run locally, in the compose stack, or on the homelab with the same code.
 
-DB note: WoundWatch reuses the existing Aidbox FHIR Postgres instance and owns
-its own `woundwatch` schema (a staging area, not the FHIR source of truth).
-`DATABASE_URL` therefore points at the same Postgres host; the schema is
-selected via the `currentSchema` query option / Alembic `search_path`.
+DB note: WoundWatch runs its **own dedicated Postgres** (its own container),
+fully independent of the FHIR server — so WoundWatch can stand on its own and
+is FHIR-server-agnostic. This DB is a staging area, not the FHIR source of
+truth (the canonical record lives on the FHIR server once a case is approved).
+The FHIR server is a pluggable external dependency (Aidbox today), addressed
+by `fhir_base_url`; nothing in WoundWatch assumes a specific FHIR product.
 """
 from functools import lru_cache
 
@@ -22,14 +24,12 @@ class Settings(BaseSettings):
     env: str = Field(default="development", description="development / production")
 
     # --- Datastores ---
-    # Postgres: same host as Aidbox, own schema. currentSchema isolates the
-    # WoundWatch staging tables from the FHIR canonical store.
+    # WoundWatch's OWN Postgres (its own container — independent of the FHIR
+    # server). In the compose stack the service overrides this to point at the
+    # `db` container; for local dev point at localhost.
     database_url: str = Field(
-        default=(
-            "postgresql://woundwatch:CHANGE_ME@localhost:5432/homelab"
-            "?currentSchema=woundwatch"
-        ),
-        description="SQLAlchemy/psycopg2 DSN for the woundwatch schema on the shared Postgres",
+        default="postgresql://woundwatch:CHANGE_ME@localhost:5432/woundwatch",
+        description="SQLAlchemy/psycopg2 DSN for WoundWatch's own Postgres container",
     )
 
     # --- FHIR server (Aidbox) ---
