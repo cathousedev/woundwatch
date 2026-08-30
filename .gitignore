@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Environment / secrets
+.env
+
+# WoundWatch data (stored photos) — never commit patient images.
+/data/
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.bmp
+
+# Alembic migrations dir is generated later (Phase 2).
+# alembic/ contents committed once Phase 2 lands.
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
